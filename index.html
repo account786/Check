@@ -3,139 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Column A Matcher</title>
-    <!-- External Libraries -->
+    <title>Excel Column A Color Downloader</title>
+    
+    <!-- প্রয়োজনীয় লাইব্রেরি (ইন্টারনেট কানেকশন লাগবে প্রথমবার লোড হতে) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #eef2f7; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; }
-        .box { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
-        label { font-weight: bold; display: block; margin-bottom: 10px; color: #444; }
-        input[type="file"], textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        textarea { height: 120px; font-family: monospace; }
-        .btn-group { text-align: center; margin-top: 20px; }
-        button { padding: 12px 25px; font-size: 16px; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; transition: 0.3s; }
-        .process-btn { background-color: #27ae60; color: white; }
-        .process-btn:hover { background-color: #219150; }
-        .download-btn { background-color: #2980b9; color: white; display: none; margin-left: 10px; }
-        .download-btn:hover { background-color: #1f6391; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; font-size: 22px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        input[type="file"], textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        textarea { height: 100px; resize: none; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
+        .btn-process { background-color: #3498db; color: white; margin-bottom: 10px; }
+        .btn-process:hover { background-color: #2980b9; }
+        .btn-download { background-color: #27ae60; color: white; display: none; }
+        .btn-download:hover { background-color: #219150; }
         #status { text-align: center; margin-top: 15px; font-weight: bold; color: #e67e22; }
-        .preview-area { margin-top: 20px; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .highlight-row { background-color: #ffff00 !important; } /* Yellow for Column A Match */
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Excel Column A ID Matcher</h2>
+<div class="card">
+    <h2>Excel Matcher & Downloader</h2>
 
-    <div class="box">
-        <label>১. এক্সেল ফাইল আপলোড করুন:</label>
-        <input type="file" id="excelFile" accept=".xlsx, .xls">
+    <div class="input-group">
+        <label>১. আপনার এক্সেল ফাইলটি দিন:</label>
+        <input type="file" id="uploadFile" accept=".xlsx, .xls">
     </div>
 
-    <div class="box">
-        <label>২. আইডিগুলো এখানে দিন (প্রতি লাইনে একটি আইডি):</label>
+    <div class="input-group">
+        <label>২. আইডিগুলো এখানে লিখুন (প্রতি লাইনে একটি):</label>
         <textarea id="idInput" placeholder="এখানে আইডি পেস্ট করুন..."></textarea>
     </div>
 
-    <div class="btn-group">
-        <button class="process-btn" onclick="processExcel()">Process & Highlight</button>
-        <button id="downloadBtn" class="download-btn" onclick="exportToExcel()">Download Colored Excel</button>
-    </div>
+    <button class="btn btn-process" onclick="handleProcessing()">ফাইল প্রসেস করুন</button>
+    <button id="downloadBtn" class="btn btn-download" onclick="generateAndDownload()">রঙিন এক্সেল ফাইলটি ডাউনলোড করুন</button>
 
     <div id="status"></div>
-    <div class="preview-area" id="previewTable"></div>
 </div>
 
 <script>
-    let finalData = [];
-    let headers = [];
-    let inputIDs = new Set();
+    let masterData = [];
+    let matchSet = new Set();
+    let originalHeaders = [];
 
-    async function processExcel() {
-        const fileInput = document.getElementById('excelFile').files[0];
-        const idText = document.getElementById('idInput').value.trim();
+    // ফাইল এবং আইডি প্রসেস করা
+    function handleProcessing() {
+        const fileInput = document.getElementById('uploadFile').files[0];
+        const textInput = document.getElementById('idInput').value.trim();
         const status = document.getElementById('status');
+        const downloadBtn = document.getElementById('downloadBtn');
 
-        if (!fileInput || !idText) {
-            alert("দয়া করে এক্সেল ফাইল এবং আইডি দুটোই প্রদান করুন।");
+        if (!fileInput || !textInput) {
+            alert("দয়া করে ফাইল এবং আইডি উভয়ই প্রদান করুন।");
             return;
         }
 
-        status.innerText = "ফাইল প্রসেসিং হচ্ছে...";
+        status.innerText = "প্রসেসিং হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।";
+        downloadBtn.style.display = "none";
 
-        // টেক্সট এরিয়া থেকে আইডিগুলো সেট-এ রাখা (দ্রুত খোঁজার জন্য)
-        inputIDs = new Set(idText.split(/\r?\n/).map(id => id.trim().toLowerCase()).filter(id => id !== ""));
+        // টেক্সট এরিয়া থেকে আইডিগুলো আলাদা করে Set এ রাখা (যাতে দ্রুত সার্চ করা যায়)
+        const lines = textInput.split(/\r?\n/).map(line => line.trim()).filter(line => line !== "");
+        matchSet = new Set(lines);
 
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             
-            // সব ডাটা অ্যারে হিসেবে নেওয়া
-            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            // সব ডাটা অ্যারে ফরম্যাটে নেওয়া
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-            if (rows.length > 0) {
-                headers = rows[0];
-                finalData = rows;
-                renderPreview();
-                document.getElementById('downloadBtn').style.display = 'inline-block';
-                status.innerText = "ম্যাচিং সম্পন্ন! কালার করা ফাইলটি এখন ডাউনলোড করতে পারবেন।";
+            if (jsonData.length > 0) {
+                originalHeaders = jsonData[0]; // প্রথম লাইন হেডার
+                masterData = jsonData; // পুরো ডাটা স্টোর করা হলো
+                
+                status.innerText = "প্রসেসিং সম্পন্ন! এখন ডাউনলোড বাটনে ক্লিক করুন।";
+                downloadBtn.style.display = "block";
+            } else {
+                status.innerText = "ফাইলটি খালি!";
             }
         };
         reader.readAsArrayBuffer(fileInput);
     }
 
-    function renderPreview() {
-        let html = "<table><thead><tr>";
-        headers.forEach(h => html += `<th>${h || ''}</th>`);
-        html += "</tr></thead><tbody>";
+    // রঙিন এক্সেল তৈরি এবং ডাউনলোড
+    async function generateAndDownload() {
+        const status = document.getElementById('status');
+        status.innerText = "ফাইল তৈরি হচ্ছে...";
 
-        for (let i = 1; i < finalData.length; i++) {
-            const row = finalData[i];
-            // কলাম A মানে row[0]
-            const columnAValue = String(row[0] || '').trim().toLowerCase();
-            const isMatched = inputIDs.has(columnAValue);
-
-            html += `<tr class="${isMatched ? 'highlight-row' : ''}">`;
-            headers.forEach((_, index) => {
-                html += `<td>${row[index] !== undefined ? row[index] : ''}</td>`;
-            });
-            html += "</tr>";
-        }
-        html += "</tbody></table>";
-        document.getElementById('previewTable').innerHTML = html;
-    }
-
-    async function exportToExcel() {
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Matched Data');
+        const worksheet = workbook.addWorksheet('Matched_Results');
 
-        // হেডার যোগ করা
-        worksheet.addRow(headers).font = { bold: true };
+        // ১. হেডার যোগ করা
+        const headerRow = worksheet.addRow(originalHeaders);
+        headerRow.font = { bold: true };
 
-        // ডাটা এবং কালার যোগ করা
-        for (let i = 1; i < finalData.length; i++) {
-            const rowData = finalData[i];
+        // ২. ডাটা চেক করা এবং কালার করা
+        for (let i = 1; i < masterData.length; i++) {
+            const rowData = masterData[i];
             const row = worksheet.addRow(rowData);
 
-            const columnAValue = String(rowData[0] || '').trim().toLowerCase();
-            
-            if (inputIDs.has(columnAValue)) {
-                // যদি কলাম A-তে আইডি মিলে যায়, তবে পুরো রো কালার হবে
+            // শুধুমাত্র A কলাম (index 0) চেক করা হচ্ছে
+            const colAValue = rowData[0] ? String(rowData[0]).trim() : "";
+
+            if (matchSet.has(colAValue)) {
+                // যদি A কলামের ডাটা ম্যাচ করে, তবে পুরো রো হলুদ হবে
                 row.eachCell((cell) => {
                     cell.fill = {
                         type: 'pattern',
                         pattern: 'solid',
-                        fgColor: { argb: 'FFFFFF00' } // Yellow
+                        fgColor: { argb: 'FFFFFF00' } // হলুদ রঙ
                     };
                     cell.border = {
                         top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'}
@@ -144,20 +127,24 @@
             }
         }
 
-        // কলাম অটো উইডথ (ঐচ্ছিক)
+        // কলামগুলোর সাইজ ঠিক করা
         worksheet.columns.forEach(column => {
-            column.width = 15;
+            column.width = 20;
         });
 
-        // ফাইল ডাউনলোড
+        // ৩. সরাসরি ডাউনলোড ট্রিগার করা
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const url = window.URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'Highlighted_A_Column_Match.xlsx';
-        anchor.click();
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Highlighted_Result.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
+
+        status.innerText = "ফাইলটি ডাউনলোড হয়েছে!";
     }
 </script>
 

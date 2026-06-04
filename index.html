@@ -3,87 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Column A Color Downloader</title>
+    <title>Excel Advanced Highlighter</title>
     
-    <!-- প্রয়োজনীয় লাইব্রেরি (ইন্টারনেট কানেকশন লাগবে প্রথমবার লোড হতে) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; font-size: 22px; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f4f8; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
         .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
-        input[type="file"], textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
-        textarea { height: 100px; resize: none; }
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
-        .btn-process { background-color: #3498db; color: white; margin-bottom: 10px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        input[type="file"], textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+        textarea { height: 120px; resize: none; font-family: monospace; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; margin-top: 10px; }
+        .btn-process { background-color: #3498db; color: white; }
         .btn-process:hover { background-color: #2980b9; }
         .btn-download { background-color: #27ae60; color: white; display: none; }
         .btn-download:hover { background-color: #219150; }
-        #status { text-align: center; margin-top: 15px; font-weight: bold; color: #e67e22; }
+        #status { text-align: center; margin-top: 20px; font-weight: bold; }
+        .legend { margin-top: 15px; font-size: 14px; }
+        .legend span { display: inline-block; width: 15px; height: 15px; margin-right: 5px; border: 1px solid #000; vertical-align: middle; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>Excel Matcher & Downloader</h2>
+<div class="container">
+    <h2>Excel ID Duplicate & Matcher</h2>
 
     <div class="input-group">
-        <label>১. আপনার এক্সেল ফাইলটি দিন:</label>
-        <input type="file" id="uploadFile" accept=".xlsx, .xls">
+        <label>১. এক্সেল ফাইল আপলোড করুন:</label>
+        <input type="file" id="excelFile" accept=".xlsx, .xls">
     </div>
 
     <div class="input-group">
-        <label>২. আইডিগুলো এখানে লিখুন (প্রতি লাইনে একটি):</label>
-        <textarea id="idInput" placeholder="এখানে আইডি পেস্ট করুন..."></textarea>
+        <label>২. আপনার আইডিগুলো দিন (টেক্সট ইনপুট):</label>
+        <textarea id="textInput" placeholder="এখানে আইডিগুলো পেস্ট করুন..."></textarea>
     </div>
 
-    <button class="btn btn-process" onclick="handleProcessing()">ফাইল প্রসেস করুন</button>
-    <button id="downloadBtn" class="btn btn-download" onclick="generateAndDownload()">রঙিন এক্সেল ফাইলটি ডাউনলোড করুন</button>
+    <button class="btn btn-process" onclick="processData()">ফাইল প্রসেস করুন</button>
+    <button id="downloadBtn" class="btn btn-download" onclick="downloadExcel()">রঙিন এক্সেল ডাউনলোড করুন</button>
 
     <div id="status"></div>
+
+    <div class="legend">
+        <p><span style="background-color: #FF0000;"></span> লাল: মাল্টিপল/ডুপ্লিকেট অ্যাকাউন্ট (Column A)</p>
+        <p><span style="background-color: #FFFF00;"></span> হলুদ: টেক্সট ইনপুটের সাথে ম্যাচ করা আইডি</p>
+    </div>
 </div>
 
 <script>
-    let masterData = [];
-    let matchSet = new Set();
-    let originalHeaders = [];
+    let excelRows = [];
+    let headers = [];
+    let idOccurrenceMap = {}; // এক্সেলে আইডি কতবার আছে তা গুনে রাখার জন্য
+    let textInputSet = new Set(); // টেক্সট ইনপুটের আইডিগুলো রাখার জন্য
 
-    // ফাইল এবং আইডি প্রসেস করা
-    function handleProcessing() {
-        const fileInput = document.getElementById('uploadFile').files[0];
-        const textInput = document.getElementById('idInput').value.trim();
+    function processData() {
+        const fileInput = document.getElementById('excelFile').files[0];
+        const textValue = document.getElementById('textInput').value.trim();
         const status = document.getElementById('status');
         const downloadBtn = document.getElementById('downloadBtn');
 
-        if (!fileInput || !textInput) {
-            alert("দয়া করে ফাইল এবং আইডি উভয়ই প্রদান করুন।");
+        if (!fileInput || !textValue) {
+            alert("দয়া করে ফাইল এবং টেক্সট ইনপুট উভয়ই দিন।");
             return;
         }
 
-        status.innerText = "প্রসেসিং হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।";
+        status.style.color = "blue";
+        status.innerText = "প্রসেসিং হচ্ছে...";
         downloadBtn.style.display = "none";
 
-        // টেক্সট এরিয়া থেকে আইডিগুলো আলাদা করে Set এ রাখা (যাতে দ্রুত সার্চ করা যায়)
-        const lines = textInput.split(/\r?\n/).map(line => line.trim()).filter(line => line !== "");
-        matchSet = new Set(lines);
+        // ১. টেক্সট ইনপুট প্রসেস করা
+        const textIds = textValue.split(/\r?\n/).map(id => id.trim()).filter(id => id !== "");
+        textInputSet = new Set(textIds);
 
+        // ২. এক্সেল ফাইল পড়া
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            
-            // সব ডাটা অ্যারে ফরম্যাটে নেওয়া
-            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            excelRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-            if (jsonData.length > 0) {
-                originalHeaders = jsonData[0]; // প্রথম লাইন হেডার
-                masterData = jsonData; // পুরো ডাটা স্টোর করা হলো
-                
-                status.innerText = "প্রসেসিং সম্পন্ন! এখন ডাউনলোড বাটনে ক্লিক করুন।";
+            if (excelRows.length > 0) {
+                headers = excelRows[0];
+                idOccurrenceMap = {};
+
+                // ৩. Column A (Index 0) এ ডুপ্লিকেট চেক করা
+                for (let i = 1; i < excelRows.length; i++) {
+                    let id = String(excelRows[i][0] || "").trim();
+                    if (id) {
+                        idOccurrenceMap[id] = (idOccurrenceMap[id] || 0) + 1;
+                    }
+                }
+
+                status.style.color = "green";
+                status.innerText = "প্রসেসিং শেষ! এখন ডাউনলোড করুন।";
                 downloadBtn.style.display = "block";
             } else {
                 status.innerText = "ফাইলটি খালি!";
@@ -92,33 +107,35 @@
         reader.readAsArrayBuffer(fileInput);
     }
 
-    // রঙিন এক্সেল তৈরি এবং ডাউনলোড
-    async function generateAndDownload() {
-        const status = document.getElementById('status');
-        status.innerText = "ফাইল তৈরি হচ্ছে...";
-
+    async function downloadExcel() {
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Matched_Results');
+        const worksheet = workbook.addWorksheet('Highlighted Results');
 
-        // ১. হেডার যোগ করা
-        const headerRow = worksheet.addRow(originalHeaders);
+        // হেডার যোগ করা
+        const headerRow = worksheet.addRow(headers);
         headerRow.font = { bold: true };
 
-        // ২. ডাটা চেক করা এবং কালার করা
-        for (let i = 1; i < masterData.length; i++) {
-            const rowData = masterData[i];
-            const row = worksheet.addRow(rowData);
+        // ডাটা এবং কালার লজিক
+        for (let i = 1; i < excelRows.length; i++) {
+            const rowData = excelRows[i];
+            const excelRow = worksheet.addRow(rowData);
+            const idValue = String(rowData[0] || "").trim();
 
-            // শুধুমাত্র A কলাম (index 0) চেক করা হচ্ছে
-            const colAValue = rowData[0] ? String(rowData[0]).trim() : "";
+            let color = null;
 
-            if (matchSet.has(colAValue)) {
-                // যদি A কলামের ডাটা ম্যাচ করে, তবে পুরো রো হলুদ হবে
-                row.eachCell((cell) => {
+            // লজিক: আগে চেক হবে ডুপ্লিকেট কি না (লাল), তারপর টেক্সট ম্যাচ (হলুদ)
+            if (idOccurrenceMap[idValue] > 1) {
+                color = 'FFFF0000'; // লাল (Red)
+            } else if (textInputSet.has(idValue)) {
+                color = 'FFFFFF00'; // হলুদ (Yellow)
+            }
+
+            if (color) {
+                excelRow.eachCell((cell) => {
                     cell.fill = {
                         type: 'pattern',
                         pattern: 'solid',
-                        fgColor: { argb: 'FFFFFF00' } // হলুদ রঙ
+                        fgColor: { argb: color }
                     };
                     cell.border = {
                         top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'}
@@ -127,24 +144,20 @@
             }
         }
 
-        // কলামগুলোর সাইজ ঠিক করা
-        worksheet.columns.forEach(column => {
-            column.width = 20;
-        });
+        // কলাম উইডথ ঠিক করা
+        worksheet.columns.forEach(col => col.width = 18);
 
-        // ৩. সরাসরি ডাউনলোড ট্রিগার করা
+        // ডাউনলোড ফাইল জেনারেট করা
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'Highlighted_Result.xlsx';
+        a.download = 'Highlighted_Accounts.xlsx';
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-
-        status.innerText = "ফাইলটি ডাউনলোড হয়েছে!";
+        document.body.removeChild(a);
     }
 </script>
 

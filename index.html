@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Column A Matcher</title>
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #eef2f7; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; }
+        .box { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        label { font-weight: bold; display: block; margin-bottom: 10px; color: #444; }
+        input[type="file"], textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        textarea { height: 120px; font-family: monospace; }
+        .btn-group { text-align: center; margin-top: 20px; }
+        button { padding: 12px 25px; font-size: 16px; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; transition: 0.3s; }
+        .process-btn { background-color: #27ae60; color: white; }
+        .process-btn:hover { background-color: #219150; }
+        .download-btn { background-color: #2980b9; color: white; display: none; margin-left: 10px; }
+        .download-btn:hover { background-color: #1f6391; }
+        #status { text-align: center; margin-top: 15px; font-weight: bold; color: #e67e22; }
+        .preview-area { margin-top: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .highlight-row { background-color: #ffff00 !important; } /* Yellow for Column A Match */
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Excel Column A ID Matcher</h2>
+
+    <div class="box">
+        <label>১. এক্সেল ফাইল আপলোড করুন:</label>
+        <input type="file" id="excelFile" accept=".xlsx, .xls">
+    </div>
+
+    <div class="box">
+        <label>২. আইডিগুলো এখানে দিন (প্রতি লাইনে একটি আইডি):</label>
+        <textarea id="idInput" placeholder="এখানে আইডি পেস্ট করুন..."></textarea>
+    </div>
+
+    <div class="btn-group">
+        <button class="process-btn" onclick="processExcel()">Process & Highlight</button>
+        <button id="downloadBtn" class="download-btn" onclick="exportToExcel()">Download Colored Excel</button>
+    </div>
+
+    <div id="status"></div>
+    <div class="preview-area" id="previewTable"></div>
+</div>
+
+<script>
+    let finalData = [];
+    let headers = [];
+    let inputIDs = new Set();
+
+    async function processExcel() {
+        const fileInput = document.getElementById('excelFile').files[0];
+        const idText = document.getElementById('idInput').value.trim();
+        const status = document.getElementById('status');
+
+        if (!fileInput || !idText) {
+            alert("দয়া করে এক্সেল ফাইল এবং আইডি দুটোই প্রদান করুন।");
+            return;
+        }
+
+        status.innerText = "ফাইল প্রসেসিং হচ্ছে...";
+
+        // টেক্সট এরিয়া থেকে আইডিগুলো সেট-এ রাখা (দ্রুত খোঁজার জন্য)
+        inputIDs = new Set(idText.split(/\r?\n/).map(id => id.trim().toLowerCase()).filter(id => id !== ""));
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            
+            // সব ডাটা অ্যারে হিসেবে নেওয়া
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            if (rows.length > 0) {
+                headers = rows[0];
+                finalData = rows;
+                renderPreview();
+                document.getElementById('downloadBtn').style.display = 'inline-block';
+                status.innerText = "ম্যাচিং সম্পন্ন! কালার করা ফাইলটি এখন ডাউনলোড করতে পারবেন।";
+            }
+        };
+        reader.readAsArrayBuffer(fileInput);
+    }
+
+    function renderPreview() {
+        let html = "<table><thead><tr>";
+        headers.forEach(h => html += `<th>${h || ''}</th>`);
+        html += "</tr></thead><tbody>";
+
+        for (let i = 1; i < finalData.length; i++) {
+            const row = finalData[i];
+            // কলাম A মানে row[0]
+            const columnAValue = String(row[0] || '').trim().toLowerCase();
+            const isMatched = inputIDs.has(columnAValue);
+
+            html += `<tr class="${isMatched ? 'highlight-row' : ''}">`;
+            headers.forEach((_, index) => {
+                html += `<td>${row[index] !== undefined ? row[index] : ''}</td>`;
+            });
+            html += "</tr>";
+        }
+        html += "</tbody></table>";
+        document.getElementById('previewTable').innerHTML = html;
+    }
+
+    async function exportToExcel() {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Matched Data');
+
+        // হেডার যোগ করা
+        worksheet.addRow(headers).font = { bold: true };
+
+        // ডাটা এবং কালার যোগ করা
+        for (let i = 1; i < finalData.length; i++) {
+            const rowData = finalData[i];
+            const row = worksheet.addRow(rowData);
+
+            const columnAValue = String(rowData[0] || '').trim().toLowerCase();
+            
+            if (inputIDs.has(columnAValue)) {
+                // যদি কলাম A-তে আইডি মিলে যায়, তবে পুরো রো কালার হবে
+                row.eachCell((cell) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFFFF00' } // Yellow
+                    };
+                    cell.border = {
+                        top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'}
+                    };
+                });
+            }
+        }
+
+        // কলাম অটো উইডথ (ঐচ্ছিক)
+        worksheet.columns.forEach(column => {
+            column.width = 15;
+        });
+
+        // ফাইল ডাউনলোড
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'Highlighted_A_Column_Match.xlsx';
+        anchor.click();
+        window.URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>

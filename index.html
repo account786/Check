@@ -3,33 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Advanced Highlighter</title>
+    <title>Excel Advanced Matcher & Reporter</title>
     
+    <!-- Google Fonts for Bengali Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- ExcelJS & XLSX JS Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f4f8; padding: 20px; color: #333; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; }
-        input[type="file"], textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
-        textarea { height: 120px; resize: none; font-family: monospace; }
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; margin-top: 10px; }
-        .btn-process { background-color: #3498db; color: white; }
-        .btn-process:hover { background-color: #2980b9; }
-        .btn-download { background-color: #27ae60; color: white; display: none; }
-        .btn-download:hover { background-color: #219150; }
-        #status { text-align: center; margin-top: 20px; font-weight: bold; }
-        .legend { margin-top: 15px; font-size: 14px; }
-        .legend span { display: inline-block; width: 15px; height: 15px; margin-right: 5px; border: 1px solid #000; vertical-align: middle; }
+        * {
+            box-sizing: border-box;
+            font-family: 'Hind Siliguri', 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 650px;
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        
+        /* Time Widget Section */
+        .header-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h2 {
+            font-size: 26px;
+            color: #38bdf8;
+            font-weight: 700;
+        }
+        .time-widget {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            padding: 10px 18px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #38bdf8;
+        }
+        .time-widget svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .input-group {
+            margin-bottom: 22px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            font-size: 15px;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            background: #0f172a;
+            border: 2px dashed #334155;
+            border-radius: 12px;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        input[type="file"]:hover {
+            border-color: #38bdf8;
+            background: #1e293b;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 14px;
+            background: #0f172a;
+            border: 1.5px solid #334155;
+            border-radius: 12px;
+            color: #f1f5f9;
+            resize: none;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        textarea:focus {
+            border-color: #38bdf8;
+        }
+
+        /* Modern Toggle Switch */
+        .switch-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 15px;
+            border-radius: 14px;
+            margin-bottom: 25px;
+        }
+        .switch-label {
+            font-size: 14px;
+            color: #fca5a5;
+            font-weight: 600;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #475569;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #ef4444;
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Buttons Style */
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn-process {
+            background: #0284c7;
+            color: white;
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);
+        }
+        .btn-process:hover {
+            background: #0369a1;
+            transform: translateY(-1px);
+        }
+        .btn-download {
+            background: #0088cc;
+            color: white;
+            display: none;
+            margin-top: 15px;
+            box-shadow: 0 4px 15px rgba(0, 136, 204, 0.3);
+        }
+        .btn-download:hover {
+            background: #0077b5;
+            transform: translateY(-1px);
+        }
+        
+        #status {
+            text-align: center;
+            margin-top: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Legend Card */
+        .legend-card {
+            background: #1e293b;
+            padding: 18px;
+            border-radius: 14px;
+            margin-top: 30px;
+            border: 1px solid #334155;
+        }
+        .legend-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #94a3b8;
+            margin-bottom: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
+        .legend-item:last-child {
+            margin-bottom: 0;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Excel ID Duplicate & Matcher</h2>
+    <div class="header-section">
+        <h2>Excel ID Duplicate & Matcher</h2>
+        <!-- লাইভ বাংলাদেশ সময় এবং তারিখ উইজেট -->
+        <div class="time-widget">
+            <svg viewBox="0 0 24 24">
+                <path d="M12,2C6.486,2,2,6.486,2,12s4.486,10,10,10s10-4.486,10-10S17.514,2,12,2z M12,20c-4.411,0-8-3.589-8-8s3.589-8,8-8s8,3.589,8,8S16.411,20,12,20z"/>
+                <path d="M13 7L11 7 11 13 17 13 17 11 13 11z"/>
+            </svg>
+            <span id="bd-live-time">লোড হচ্ছে...</span>
+        </div>
+    </div>
 
     <div class="input-group">
         <label>১. এক্সেল ফাইল আপলোড করুন:</label>
@@ -41,22 +267,74 @@
         <textarea id="textInput" placeholder="এখানে আইডিগুলো পেস্ট করুন..."></textarea>
     </div>
 
+    <!-- ডিলিট অপশন সুইচ -->
+    <div class="switch-container">
+        <span class="switch-label">ম্যাচ হওয়া আইডিগুলোর রো ডিলিট করতে চান?</span>
+        <label class="switch">
+            <input type="checkbox" id="deleteSwitch">
+            <span class="slider"></span>
+        </label>
+    </div>
+
     <button class="btn btn-process" onclick="processData()">ফাইল প্রসেস করুন</button>
-    <button id="downloadBtn" class="btn btn-download" onclick="downloadExcel()">রঙিন এক্সেল ডাউনলোড করুন</button>
+    <button id="downloadBtn" class="btn btn-download" onclick="sendToTelegram()">টেলিগ্রামে রিপোর্ট পাঠান</button>
 
     <div id="status"></div>
 
-    <div class="legend">
-        <p><span style="background-color: #FF0000;"></span> লাল: মাল্টিপল/ডুপ্লিকেট অ্যাকাউন্ট (Column A)</p>
-        <p><span style="background-color: #FFFF00;"></span> হলুদ: টেক্সট ইনপুটের সাথে ম্যাচ করা আইডি</p>
+    <div class="legend-card">
+        <div class="legend-title">কালার লিজেন্ড:</div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #FF0000;"></div>
+            <span>লাল: ডুপ্লিকেট অ্যাকাউন্ট (Column A)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #FFFF00;"></div>
+            <span>হলুদ: টেক্সট ইনপুটের সাথে ম্যাচ করা আইডি</span>
+        </div>
     </div>
 </div>
 
 <script>
     let excelRows = [];
     let headers = [];
-    let idOccurrenceMap = {}; // এক্সেলে আইডি কতবার আছে তা গুনে রাখার জন্য
-    let textInputSet = new Set(); // টেক্সট ইনপুটের আইডিগুলো রাখার জন্য
+    let idOccurrenceMap = {}; 
+    let textInputSet = new Set(); 
+
+    // লাইভ ঘড়ি সেটআপ (বাংলাদেশ সময়)
+    function updateBDClock() {
+        const timeOptions = {
+            timeZone: 'Asia/Dhaka',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        };
+        const formatter = new Intl.DateTimeFormat('bn-BD', timeOptions);
+        document.getElementById('bd-live-time').innerText = formatter.format(new Date());
+    }
+    
+    // প্রতি সেকেন্ডে সময় আপডেট হবে
+    setInterval(updateBDClock, 1000);
+    updateBDClock();
+
+    // ফাইলের জন্য বাংলাদেশ সময় ফরম্যাট করা
+    function getFileNameWithBDTime() {
+        const now = new Date();
+        const bdOffset = 6 * 60 * 60 * 1000; // UTC+6
+        const bdTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + bdOffset);
+        
+        const yyyy = bdTime.getFullYear();
+        const mm = String(bdTime.getMonth() + 1).padStart(2, '0');
+        const dd = String(bdTime.getDate()).padStart(2, '0');
+        const hh = String(bdTime.getHours()).padStart(2, '0');
+        const min = String(bdTime.getMinutes()).padStart(2, '0');
+        const ss = String(bdTime.getSeconds()).padStart(2, '0');
+        
+        return `checking_file_${dd}-${mm}-${yyyy}_${hh}-${min}-${ss}.xlsx`;
+    }
 
     function processData() {
         const fileInput = document.getElementById('excelFile').files[0];
@@ -69,15 +347,13 @@
             return;
         }
 
-        status.style.color = "blue";
+        status.style.color = "#38bdf8";
         status.innerText = "প্রসেসিং হচ্ছে...";
         downloadBtn.style.display = "none";
 
-        // ১. টেক্সট ইনপুট প্রসেস করা
         const textIds = textValue.split(/\r?\n/).map(id => id.trim()).filter(id => id !== "");
         textInputSet = new Set(textIds);
 
-        // ২. এক্সেল ফাইল পড়া
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = new Uint8Array(e.target.result);
@@ -89,7 +365,6 @@
                 headers = excelRows[0];
                 idOccurrenceMap = {};
 
-                // ৩. Column A (Index 0) এ ডুপ্লিকেট চেক করা
                 for (let i = 1; i < excelRows.length; i++) {
                     let id = String(excelRows[i][0] || "").trim();
                     if (id) {
@@ -97,38 +372,51 @@
                     }
                 }
 
-                status.style.color = "green";
-                status.innerText = "প্রসেসিং শেষ! এখন ডাউনলোড করুন।";
-                downloadBtn.style.display = "block";
+                status.style.color = "#4ade80";
+                status.innerText = "প্রসেসিং শেষ! টেলিগ্রামে পাঠাতে নিচের বাটনে ক্লিক করুন।";
+                downloadBtn.style.display = "flex";
             } else {
+                status.style.color = "#ef4444";
                 status.innerText = "ফাইলটি খালি!";
             }
         };
         reader.readAsArrayBuffer(fileInput);
     }
 
-    async function downloadExcel() {
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Highlighted Results');
+    async function sendToTelegram() {
+        const status = document.getElementById('status');
+        const deleteMatched = document.getElementById('deleteSwitch').checked;
 
-        // হেডার যোগ করা
+        status.style.color = "#38bdf8";
+        status.innerText = "টেলিগ্রামে ফাইল পাঠানো হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...";
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Checked Results');
+
         const headerRow = worksheet.addRow(headers);
         headerRow.font = { bold: true };
 
-        // ডাটা এবং কালার লজিক
         for (let i = 1; i < excelRows.length; i++) {
             const rowData = excelRows[i];
-            const excelRow = worksheet.addRow(rowData);
             const idValue = String(rowData[0] || "").trim();
 
             let color = null;
+            let isMatched = false;
 
-            // লজিক: আগে চেক হবে ডুপ্লিকেট কি না (লাল), তারপর টেক্সট ম্যাচ (হলুদ)
             if (idOccurrenceMap[idValue] > 1) {
-                color = 'FFFF0000'; // লাল (Red)
+                color = 'FFFF0000'; 
+                isMatched = true;
             } else if (textInputSet.has(idValue)) {
-                color = 'FFFFFF00'; // হলুদ (Yellow)
+                color = 'FFFFFF00'; 
+                isMatched = true;
             }
+
+            // ডিলিট সুইচ অন থাকলে রো স্কিপ করা হবে
+            if (deleteMatched && isMatched) {
+                continue;
+            }
+
+            const excelRow = worksheet.addRow(rowData);
 
             if (color) {
                 excelRow.eachCell((cell) => {
@@ -144,20 +432,47 @@
             }
         }
 
-        // কলাম উইডথ ঠিক করা
         worksheet.columns.forEach(col => col.width = 18);
 
-        // ডাউনলোড ফাইল জেনারেট করা
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'Highlighted_Accounts.xlsx';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        try {
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            
+            // ডায়নামিক নাম জেনারেশন
+            const finalFileName = getFileNameWithBDTime();
+
+            const botToken = "8917387680:AAFLY0U7TLoDC8FzGmi7PnxlTxWlXFE15_4";
+            const chatId = "-1003706078427";
+
+            const formData = new FormData();
+            formData.append('chat_id', chatId);
+            formData.append('document', blob, finalFileName);
+            
+            let captionText = `চেকিং ফাইল প্রসেস করা হয়েছে।\nতারিখ ও সময় (বাংলাদেশ সময়): ${document.getElementById('bd-live-time').innerText}`;
+            if (deleteMatched) {
+                captionText += '\n[বিঃদ্রঃ: ম্যাচ হওয়া আইডিগুলো সম্পূর্ণ বাদ দেওয়া হয়েছে]';
+            }
+            formData.append('caption', captionText);
+
+            const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.ok) {
+                status.style.color = "#4ade80";
+                status.innerText = `ফাইলটি সফলভাবে টেলিগ্রামে পাঠানো হয়েছে!\nনাম: ${finalFileName}`;
+            } else {
+                status.style.color = "#ef4444";
+                status.innerText = "টেলিগ্রামে ফাইল পাঠাতে সমস্যা হয়েছে: " + result.description;
+            }
+
+        } catch (error) {
+            status.style.color = "#ef4444";
+            status.innerText = "ত্রুটি ঘটেছে: " + error.message;
+        }
     }
 </script>
 

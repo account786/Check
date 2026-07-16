@@ -556,8 +556,29 @@
 
         // রিপোর্টের শেষে তারিখের জন্য কলাম বাড়ানো হলো
         const outputHeaders = [...headers, "ডাটাবেজ সেভের তারিখ"];
+        
+        // ১ম লাইন ১ম কলামে (A1 সেল) কোনো লেখা থাকবে না
+        outputHeaders[0] = ""; 
+        
         const headerRow = worksheet.addRow(outputHeaders);
         headerRow.font = { bold: true };
+
+        // সেল A1 সম্পূর্ণ ক্লিয়ার এবং হাইলাইট মুক্ত করার জন্য ডিফল্ট সেটিং
+        const cellA1 = headerRow.getCell(1);
+        cellA1.value = "";
+        cellA1.fill = {
+            type: 'pattern',
+            pattern: 'none'
+        };
+        cellA1.border = {
+            top: null, left: null, bottom: null, right: null
+        };
+        cellA1.font = {
+            name: 'Calibri',
+            size: 11,
+            bold: false,
+            color: { argb: 'FF000000' }
+        };
 
         const dbIdSet = new Set(allNumbers.map(item => normalizeId(item.value)));
         
@@ -568,6 +589,12 @@
             dbDateMap[norm] = item.date;
         });
 
+        // পরিসংখ্যান কাউন্টার ভেরিয়েবলসমূহ
+        let totalOriginalCount = 0; // মোট অরিজিনাল আইডি (খালি বাদে কলাম A-তে মোট কতটি আইডি ইনপুট হয়েছে)
+        let bannedCount = 0;        // বাদ হওয়া বা ব্যান আইডি (হলুদ - টেক্সট ইনপুট ম্যাচ)
+        let duplicateCount = 0;     // ডুবলিকেট আইডি (লাল - এক্সেলে নিজের কলামে ডুপ্লিকেট)
+        let savedCount = 0;         // পূর্বে সেল আইডি (কমলা - ডাটাবেজ ম্যাচ)
+
         for (let i = 1; i < excelRows.length; i++) {
             const rowData = excelRows[i];
             const rawId = rowData[0];
@@ -577,9 +604,13 @@
                 continue;
             }
 
+            // মূল ইনপুটের আইডি সংখ্যা গণনা
+            totalOriginalCount++;
+
             const idValueNorm = normalizeId(rawId);
             let color = null;
             let isMatched = false;
+            let matchType = null;
 
             const isExcelDuplicate = idOccurrenceMap[idValueNorm] > 1;
             const isTextInputMatch = textInputSet.has(idValueNorm);
@@ -589,12 +620,18 @@
             if (isExcelDuplicate) {
                 color = 'FFFF0000'; // Red
                 isMatched = true;
+                matchType = 'red';
+                duplicateCount++; // ডুবলিকেট আইডি
             } else if (isTextInputMatch) {
                 color = 'FFFFFF00'; // Yellow
                 isMatched = true;
+                matchType = 'yellow';
+                bannedCount++; // বাদ হওয়া বা ব্যান আইডি
             } else if (isFirebaseMatch) {
                 color = 'FFFF9900'; // Orange
                 isMatched = true;
+                matchType = 'orange';
+                savedCount++; // পূর্বে সেল আইডি
             }
 
             // ডিলিট সুইচ অন থাকলে ম্যাচড রোগুলো সম্পূর্ণ বাদ যাবে
@@ -626,6 +663,9 @@
             }
         }
 
+        // রিসিভ আইডি হিসাব: মোট আইডি - (বাদ হওয়া বা ব্যান + ডুবলিকেট + পূর্বে সেল)
+        const receiveCount = totalOriginalCount - bannedCount - duplicateCount - savedCount;
+
         worksheet.columns.forEach(col => col.width = 18);
 
         try {
@@ -645,11 +685,18 @@
             formData.append('chat_id', chatId);
             formData.append('document', blob, finalFileName);
             
-            let timeText = document.getElementById('liveClock').innerText.replace('অনলাইন সময়', '').trim();
-            let captionText = `চেকিং ফাইল প্রসেস করা হয়েছে।\nতারিখ ও সময় (বাংলাদেশ সময়): ${timeText}`;
-            if (deleteMatched) {
-                captionText += '\n[বিঃদ্রঃ: ম্যাচ হওয়া আইডিগুলো ফাইল থেকে বাদ দেওয়া হয়েছে]';
-            }
+            // HTML পার্সিং মোড সক্রিয় করা হলো
+            formData.append('parse_mode', 'HTML'); 
+
+            // রিসিভ আইডি হাইলাইট করে এবং দৃষ্টিনন্দন ডিভাইডার দিয়ে ডিজাইন করা ক্যাপশন
+            let captionText = `•মোট আইডি: <b>${totalOriginalCount}</b> টি\n`;
+            captionText += `•বাদ হওয়া বা ব্যান আইডি: <b>${bannedCount}</b> টি\n`;
+            captionText += `•ডুবলিকেট আইডি: <b>${duplicateCount}</b> টি\n`;
+            captionText += `•পূর্বে সেল আইডি: <b>${savedCount}</b> টি\n\n`;
+            captionText += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+            captionText += `🟢 <b><u>রিসিভ আইডি: ${receiveCount} টি</u></b> 🟢\n`;
+            captionText += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`;
+
             formData.append('caption', captionText);
 
             const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
@@ -674,6 +721,7 @@
     }
 
     // এক্সেলে থাকা নতুন ইউনিক আইডিগুলো ডাটাবেজে যুক্ত করা (Column A)
+    // (এখানে শুধুমাত্র রিসিভ হওয়া প্রকৃত ইউনিক আইডিগুলোই ডাটাবেজে যোগ করা হবে)
     function importExcelToFirebase() {
         if (excelRows.length === 0) {
             alert("প্রথমে একটি এক্সেল ফাইল প্রসেস করুন!");

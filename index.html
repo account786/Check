@@ -554,41 +554,14 @@
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Checked Results');
 
-        // রিপোর্টের শেষে তারিখের জন্য কলাম বাড়ানো হলো
-        const outputHeaders = [...headers, "ডাটাবেজ সেভের তারিখ"];
-        
-        // ১ম লাইন ১ম কলামে (A1 সেল) কোনো লেখা থাকবে না
-        outputHeaders[0] = ""; 
+        // মূল হেডারটি হুবহু রাখা হলো (কোনো অতিরিক্ত কলাম বা লেখা পরিবর্তন ছাড়াই)
+        const outputHeaders = [...headers];
         
         const headerRow = worksheet.addRow(outputHeaders);
         headerRow.font = { bold: true };
 
-        // সেল A1 সম্পূর্ণ ক্লিয়ার এবং হাইলাইট মুক্ত করার জন্য ডিফল্ট সেটিং
-        const cellA1 = headerRow.getCell(1);
-        cellA1.value = "";
-        cellA1.fill = {
-            type: 'pattern',
-            pattern: 'none'
-        };
-        cellA1.border = {
-            top: null, left: null, bottom: null, right: null
-        };
-        cellA1.font = {
-            name: 'Calibri',
-            size: 11,
-            bold: false,
-            color: { argb: 'FF000000' }
-        };
-
         const dbIdSet = new Set(allNumbers.map(item => normalizeId(item.value)));
         
-        // দ্রুত তারিখ খোঁজার জন্য ম্যাপ তৈরি
-        const dbDateMap = {};
-        allNumbers.forEach(item => {
-            const norm = normalizeId(item.value);
-            dbDateMap[norm] = item.date;
-        });
-
         // পরিসংখ্যান কাউন্টার ভেরিয়েবলসমূহ
         let totalOriginalCount = 0; // মোট অরিজিনাল আইডি (খালি বাদে কলাম A-তে মোট কতটি আইডি ইনপুট হয়েছে)
         let bannedCount = 0;        // বাদ হওয়া বা ব্যান আইডি (হলুদ - টেক্সট ইনপুট ম্যাচ)
@@ -610,7 +583,6 @@
             const idValueNorm = normalizeId(rawId);
             let color = null;
             let isMatched = false;
-            let matchType = null;
 
             const isExcelDuplicate = idOccurrenceMap[idValueNorm] > 1;
             const isTextInputMatch = textInputSet.has(idValueNorm);
@@ -620,17 +592,14 @@
             if (isExcelDuplicate) {
                 color = 'FFFF0000'; // Red
                 isMatched = true;
-                matchType = 'red';
                 duplicateCount++; // ডুবলিকেট আইডি
             } else if (isTextInputMatch) {
                 color = 'FFFFFF00'; // Yellow
                 isMatched = true;
-                matchType = 'yellow';
                 bannedCount++; // বাদ হওয়া বা ব্যান আইডি
             } else if (isFirebaseMatch) {
                 color = 'FFFF9900'; // Orange
                 isMatched = true;
-                matchType = 'orange';
                 savedCount++; // পূর্বে সেল আইডি
             }
 
@@ -639,14 +608,8 @@
                 continue;
             }
 
-            // যদি এটি ডাটাবেজ ম্যাচ হয়, তবে rowData-র শেষে তারিখ যোগ করা হবে
+            // ফাইল যেমন ছিল তেমনই থাকবে, অতিরিক্ত কোনো লেখা/তারিখ যুক্ত হবে না
             const exportRowData = [...rowData];
-            if (isFirebaseMatch) {
-                exportRowData.push(dbDateMap[idValueNorm] || "তারিখ নেই");
-            } else {
-                exportRowData.push(""); // সাধারণ ডাটা হলে ফাঁকা থাকবে
-            }
-
             const excelRow = worksheet.addRow(exportRowData);
 
             if (color) {

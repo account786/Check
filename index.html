@@ -123,6 +123,9 @@
         input:checked + .slider { background-color: var(--danger); }
         input:checked + .slider:before { transform: translateX(22px); }
 
+        /* Header Switch Accent Color Override */
+        #headerSwitch:checked + .slider { background-color: var(--primary); }
+
         /* Action Buttons */
         .action-btns { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
         .btn {
@@ -217,6 +220,15 @@
             <div style="margin-bottom: 15px;">
                 <label>১. এক্সেল ফাইল আপলোড করুন:</label>
                 <input type="file" id="excelFile" accept=".xlsx, .xls">
+            </div>
+
+            <!-- হেডার কনফিগারেশন সুইচ -->
+            <div class="switch-container" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); margin-bottom: 15px;">
+                <span class="switch-label" style="color: #cbd5e1;">এক্সেল ফাইলের প্রথম লাইনে কি কলামের নাম (Header) আছে?</span>
+                <label class="switch">
+                    <input type="checkbox" id="headerSwitch" checked>
+                    <span class="slider"></span>
+                </label>
             </div>
 
             <div style="margin-bottom: 15px;">
@@ -358,7 +370,7 @@
         return String(id || "").trim().toLowerCase();
     }
 
-    // বাংলাদেশ সুনির্দিষ্ট তারিখ ও সময় পাওয়ার ফাংশন
+    // বাংলাদেশ সুনির্দিষ্ট তারিখ ও সময় ঘোষণা
     function getBDDateTimeString() {
         const now = new Date();
         const bdOffset = 6 * 60 * 60 * 1000; // UTC+6
@@ -457,6 +469,7 @@
     function processExcelData() {
         const fileInput = document.getElementById('excelFile').files[0];
         const textValue = document.getElementById('textInput').value.trim();
+        const hasHeader = document.getElementById('headerSwitch').checked;
         const status = document.getElementById('status');
         const telegramBtn = document.getElementById('telegramBtn');
         const addToDbBtn = document.getElementById('addToDbBtn');
@@ -486,11 +499,24 @@
             excelRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
             if (excelRows.length > 0) {
-                headers = excelRows[0];
+                const startIndex = hasHeader ? 1 : 0;
+
+                // হেডার ডিক্লেয়ারেশন
+                if (hasHeader) {
+                    headers = excelRows[0];
+                } else {
+                    // কলামের নাম না থাকলে ডিফল্ট কলামের নাম তৈরি
+                    const numCols = excelRows[0] ? excelRows[0].length : 1;
+                    headers = [];
+                    for (let c = 0; c < numCols; c++) {
+                        headers.push(`Column ${String.fromCharCode(65 + c)}`);
+                    }
+                }
+
                 idOccurrenceMap = {};
 
                 // কলাম A এর আইডিগুলোর কাউন্ট নেওয়া (খালি রো বাদে)
-                for (let i = 1; i < excelRows.length; i++) {
+                for (let i = startIndex; i < excelRows.length; i++) {
                     let rawId = excelRows[i][0];
                     if (rawId === undefined || rawId === null || String(rawId).trim() === "") continue;
                     let id = normalizeId(rawId);
@@ -503,7 +529,7 @@
                 let dbMatchCount = 0;
                 let totalValidRows = 0;
 
-                for (let i = 1; i < excelRows.length; i++) {
+                for (let i = startIndex; i < excelRows.length; i++) {
                     let rawId = excelRows[i][0];
                     if (rawId === undefined || rawId === null || String(rawId).trim() === "") continue;
                     
@@ -547,6 +573,8 @@
     async function sendToTelegram() {
         const status = document.getElementById('status');
         const deleteMatched = document.getElementById('deleteSwitch').checked;
+        const hasHeader = document.getElementById('headerSwitch').checked;
+        const startIndex = hasHeader ? 1 : 0;
 
         status.style.color = "#38bdf8";
         status.innerHTML = `<i class="fas fa-spinner fa-spin"></i> টেলিগ্রামে রিপোর্ট পাঠানো হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...`;
@@ -554,11 +582,10 @@
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Checked Results');
 
-        // মূল হেডারটি হুবহু রাখা হলো (কোনো অতিরিক্ত কলাম বা লেখা পরিবর্তন ছাড়াই)
+        // মূল হেডারটি হুবহু রাখা হলো
         const outputHeaders = [...headers];
         
         const headerRow = worksheet.addRow(outputHeaders);
-        headerRow.font = { bold: true };
 
         const dbIdSet = new Set(allNumbers.map(item => normalizeId(item.value)));
         
@@ -568,7 +595,7 @@
         let duplicateCount = 0;     // ডুবলিকেট আইডি (লাল - এক্সেলে নিজের কলামে ডুপ্লিকেট)
         let savedCount = 0;         // পূর্বে সেল আইডি (কমলা - ডাটাবেজ ম্যাচ)
 
-        for (let i = 1; i < excelRows.length; i++) {
+        for (let i = startIndex; i < excelRows.length; i++) {
             const rowData = excelRows[i];
             const rawId = rowData[0];
             
@@ -691,12 +718,14 @@
             return;
         }
         const status = document.getElementById('status');
+        const hasHeader = document.getElementById('headerSwitch').checked;
+        const startIndex = hasHeader ? 1 : 0;
         const dbIdSet = new Set(allNumbers.map(item => normalizeId(item.value)));
         
         // ১. এক্সেল থেকে ইউনিক আইডিগুলোর ম্যাপ তৈরি (যাতে এক্সেলের অভ্যন্তরীণ ডুপ্লিকেট বাদ যায়)
         const excelUniqueMap = new Map(); // key: normalized ID, value: original casing ID
 
-        for (let i = 1; i < excelRows.length; i++) {
+        for (let i = startIndex; i < excelRows.length; i++) {
             let rawId = excelRows[i][0];
             if (rawId === undefined || rawId === null || String(rawId).trim() === "") continue;
 
